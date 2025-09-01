@@ -2,9 +2,23 @@ use std::{collections::HashSet, error::Error, fmt::Display, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
+use tracing::{error, info, level_filters::LevelFilter};
+use tracing_subscriber::{
+    EnvFilter, Layer, fmt::layer, layer::SubscriberExt, util::SubscriberInitExt,
+};
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::registry()
+        .with(
+            layer().compact().with_target(false).with_filter(
+                EnvFilter::builder()
+                    .with_default_directive(LevelFilter::INFO.into())
+                    .from_env_lossy(),
+            ),
+        )
+        .init();
+
     let client = reqwest::Client::new();
     let mut previous_orders = HashSet::new();
     loop {
@@ -13,12 +27,12 @@ async fn main() {
                 let new_orders = current_orders.difference(&previous_orders);
 
                 for o in new_orders {
-                    println!("{o}")
+                    info!("{o}")
                 }
 
                 previous_orders = current_orders;
             }
-            Err(err) => println!("{err}"),
+            Err(err) => error!("{err}"),
         }
 
         sleep(Duration::from_millis(2000)).await;
