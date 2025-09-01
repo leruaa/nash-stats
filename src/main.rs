@@ -8,7 +8,7 @@ use tracing_subscriber::{
 };
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             layer().compact().with_target(false).with_filter(
@@ -20,7 +20,8 @@ async fn main() {
         .init();
 
     let client = reqwest::Client::new();
-    let mut previous_orders = HashSet::new();
+    let mut previous_orders = fetch(&client).await?;
+
     loop {
         match fetch(&client).await {
             Ok(current_orders) => {
