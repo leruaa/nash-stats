@@ -18,11 +18,6 @@ mod db;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
-
-    info!("Start server...");
-    init(&args.persist_path)?;
-
     tracing_subscriber::registry()
         .with(
             layer().compact().with_target(false).with_filter(
@@ -33,9 +28,15 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    let args = Args::parse();
+
+    info!("Init DB");
+    init(&args.persist_path)?;
+
     let client = reqwest::Client::new();
     let mut previous_orders = fetch(&client).await?;
 
+    info!("Fetching orders...");
     loop {
         match fetch(&client).await {
             Ok(current_orders) => {
@@ -136,14 +137,15 @@ impl Display for Order {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} {} {} for {} {} at {} {}",
+            "{} {} {} for {} {} at {} {} on {}",
             self.ty,
             self.crypto_amount,
             self.crypto_symbol,
             self.fiat_amount,
             self.fiat_symbol,
             self.fiat_price,
-            self.fiat_symbol
+            self.fiat_symbol,
+            self.blockchain
         )
     }
 }
