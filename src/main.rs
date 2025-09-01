@@ -20,6 +20,7 @@ mod db;
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
+    info!("Start server...");
     init(&args.persist_path)?;
 
     tracing_subscriber::registry()
@@ -47,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 for o in new_orders {
-                    info!("{o}");
+                    info!("New order: {o}");
 
                     if let Err(err) = insert_order(o, &args.persist_path) {
                         error!("Failed to insert order: {err}");
