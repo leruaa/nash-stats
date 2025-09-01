@@ -1,14 +1,27 @@
 use std::{collections::HashSet, error::Error, fmt::Display, time::Duration};
 
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
-use tracing::{error, info, level_filters::LevelFilter};
+use tracing::{error, info, level_filters::LevelFilter, warn};
 use tracing_subscriber::{
     EnvFilter, Layer, fmt::layer, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
+use crate::{
+    args::Args,
+    db::{init, insert_order},
+};
+
+mod args;
+mod db;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+
+    init(&args.persist_path)?;
+
     tracing_subscriber::registry()
         .with(
             layer().compact().with_target(false).with_filter(
@@ -25,10 +38,20 @@ async fn main() -> anyhow::Result<()> {
     loop {
         match fetch(&client).await {
             Ok(current_orders) => {
-                let new_orders = current_orders.difference(&previous_orders);
+                let new_orders = current_orders
+                    .difference(&previous_orders)
+                    .collect::<Vec<_>>();
+
+                if new_orders.len() == current_orders.len() {
+                    warn!("New orders possibily missed");
+                }
 
                 for o in new_orders {
-                    info!("{o}")
+                    info!("{o}");
+
+                    if let Err(err) = insert_order(o, &args.persist_path) {
+                        error!("Failed to insert order: {err}");
+                    }
                 }
 
                 previous_orders = current_orders;
