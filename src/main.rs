@@ -120,18 +120,39 @@ impl Display for OrdersError {
 
 impl Error for OrdersError {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Order {
     #[serde(rename = "type")]
     ty: OrderType,
     blockchain: String,
-    crypto_amount: String,
+    #[serde(deserialize_with = "from_str_to_f64")]
+    crypto_amount: f64,
     crypto_symbol: String,
-    fiat_amount: String,
-    fiat_price: String,
+    #[serde(deserialize_with = "from_str_to_f64")]
+    fiat_amount: f64,
+    #[serde(deserialize_with = "from_str_to_f64")]
+    fiat_price: f64,
     fiat_symbol: String,
 }
+
+impl PartialEq for Order {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty
+            && self.blockchain == other.blockchain
+            && self
+                .crypto_amount
+                .abs_diff_eq(&other.crypto_amount, f64::EPSILON)
+            && self.crypto_symbol == other.crypto_symbol
+            && self
+                .fiat_amount
+                .abs_diff_eq(&other.fiat_amount, f64::EPSILON)
+            && self.fiat_price.abs_diff_eq(&other.fiat_price, f64::EPSILON)
+            && self.fiat_symbol == other.fiat_symbol
+    }
+}
+
+impl Eq for Order {}
 
 impl Display for Order {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -150,6 +171,18 @@ impl Display for Order {
     }
 }
 
+impl Hash for Order {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ty.hash(state);
+        self.blockchain.hash(state);
+        self.crypto_amount.to_bits().hash(state);
+        self.crypto_symbol.hash(state);
+        self.fiat_amount.to_bits().hash(state);
+        self.fiat_price.to_bits().hash(state);
+        self.fiat_symbol.hash(state);
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 enum OrderType {
@@ -164,4 +197,12 @@ impl Display for OrderType {
             OrderType::Sell => write!(f, "sell"),
         }
     }
+}
+
+fn from_str_to_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    s.parse::<f64>().map_err(serde::de::Error::custom)
 }
