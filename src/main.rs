@@ -1,7 +1,12 @@
-use std::{collections::HashSet, error::Error, fmt::Display, time::Duration};
+use std::{
+    collections::HashSet, error::Error, fmt::Display, hash::Hash, str::FromStr, time::Duration,
+};
 
+use anyhow::anyhow;
+use approx::AbsDiffEq;
 use clap::Parser;
-use serde::{Deserialize, Serialize};
+use duckdb::types::{FromSql, FromSqlError};
+use serde::{Deserialize, Deserializer, Serialize};
 use tokio::time::sleep;
 use tracing::{error, info, level_filters::LevelFilter, warn};
 use tracing_subscriber::{
@@ -10,7 +15,7 @@ use tracing_subscriber::{
 
 use crate::{
     args::Args,
-    db::{init, insert_order},
+    db::{get_latest_orders, init, insert_order},
 };
 
 mod args;
@@ -34,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
     init(&args.persist_path)?;
 
     let client = reqwest::Client::new();
-    let mut previous_orders = fetch(&client).await?;
+    let mut previous_orders = HashSet::from_iter(get_latest_orders(&args.persist_path)?);
 
     info!("Fetching orders...");
     loop {
@@ -196,6 +201,27 @@ impl Display for OrderType {
             OrderType::Buy => write!(f, "buy"),
             OrderType::Sell => write!(f, "sell"),
         }
+    }
+}
+
+impl FromStr for OrderType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "buy" => Ok(OrderType::Buy),
+            "sell" => Ok(OrderType::Sell),
+            other => Err(anyhow!("Order type {other} not supported")),
+        }
+    }
+}
+
+impl FromSql for OrderType {
+    fn column_result(value: duckdb::types::ValueRef<'_>) -> duckdb::types::FromSqlResult<Self> {
+        value.as_str().and_then(|str| {
+            str.parse::<OrderType>()
+                .map_err(|err| FromSqlError::Other(err.into_boxed_dyn_error()))
+        })
     }
 }
 
