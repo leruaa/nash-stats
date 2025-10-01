@@ -5,4 +5,7 @@ use clap::Parser;
 pub struct Args {
     #[arg(long, env)]
     pub persist_path: String,
+
+    #[arg(long, env, default_value_t = 2)]
+    pub fetch_interval: u64,
 }
