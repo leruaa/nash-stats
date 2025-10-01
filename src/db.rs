@@ -1,7 +1,7 @@
 use chrono::Utc;
 use duckdb::{Connection, params};
 
-use crate::Order;
+use crate::fetch::Order;
 
 pub fn init(persist_path: &str) -> anyhow::Result<()> {
     let conn = get_connection(persist_path)?;
