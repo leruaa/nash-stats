@@ -62,6 +62,6 @@ async fn main() -> anyhow::Result<()> {
             Err(err) => error!("{err}"),
         }
 
-        sleep(Duration::from_millis(args.fetch_interval)).await;
+        sleep(Duration::from_secs(args.fetch_interval)).await;
     }
 }
