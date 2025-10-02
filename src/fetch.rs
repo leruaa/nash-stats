@@ -1,18 +1,22 @@
 use std::{collections::HashSet, error::Error, fmt::Display, hash::Hash, str::FromStr};
 
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use approx::AbsDiffEq;
 use duckdb::types::{FromSql, FromSqlError};
 use serde::{Deserialize, Deserializer, Serialize};
 
 pub async fn fetch(client: &reqwest::Client) -> anyhow::Result<HashSet<Order>> {
-    let current_orders: LatestOrders = client
+    let response_text = client
         .get("https://app.nash.io/api/cash/latest_completed_orders")
         .send()
         .await?
-        .json::<OrdersResponse>()
-        .await?
-        .try_into()?;
+        .text()
+        .await?;
+
+    let current_orders = match serde_json::from_str::<OrdersResponse>(&response_text) {
+        Ok(response) => LatestOrders::try_from(response)?,
+        Err(_) => bail!("Failed to deserialize '{response_text}'"),
+    };
 
     Ok(current_orders.into_set())
 }
