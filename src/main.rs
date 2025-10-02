@@ -3,6 +3,7 @@ use std::{collections::HashSet, time::Duration};
 use clap::Parser;
 use tokio::time::sleep;
 use tracing::{error, info, level_filters::LevelFilter, warn};
+use tracing_appender::rolling;
 use tracing_subscriber::{
     EnvFilter, Layer, fmt::layer, layer::SubscriberExt, util::SubscriberInitExt,
 };
@@ -19,6 +20,12 @@ mod fetch;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Create a rolling file appender
+    let file_appender = rolling::never("/logs", "logs.txt");
+
+    // Create a layer that writes to the file
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
     tracing_subscriber::registry()
         .with(
             layer().compact().with_target(false).with_filter(
@@ -26,6 +33,13 @@ async fn main() -> anyhow::Result<()> {
                     .with_default_directive(LevelFilter::INFO.into())
                     .from_env_lossy(),
             ),
+        )
+        .with(
+            layer()
+                .compact()
+                .with_target(false)
+                .with_writer(non_blocking)
+                .with_filter(LevelFilter::INFO),
         )
         .init();
 
